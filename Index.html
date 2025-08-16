@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabha Al Salem Zone </title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        :root {
+            --primary: #ff6b35;
+            --primary-light: #ff8c5a;
+            --secondary: #2b4162;
+            --light: #f8f9fa;
+            --light-bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --text-light: #666666;
+            --border: #e0e0e0;
+            --success: #28a745;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        /* Map overlay search */
+        .map-search-overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 500px;
+            z-index: 1000;
+        }
+        
+        .map-search-container {
+            position: relative;
+            width: 100%;
+        }
+        
+        .map-search-container input {
+            width: 100%;
+            padding: 16px 20px;
+            padding-left: 55px;
+            border-radius: 50px;
+            border: 1px solid var(--border);
+            font-size: 1.1rem;
+            background: var(--card-bg);
+            color: var(--text);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px var(--shadow);
+        }
+        
+        .map-search-container input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.2);
+        }
+        
+        .map-search-container input::placeholder {
+            color: var(--text-light);
+        }
+        
+        .map-search-container i {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.3rem;
+        }
+        
+        /* Search results dropdown */
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            background: var(--card-bg);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px var(--shadow);
+            border: 1px solid var(--border);
+            margin-top: 10px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .search-results.show {
+            display: block;
+        }
+        
+        .search-result-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 1px solid var(--light-bg);
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .search-result-item:hover {
+            background: var(--light-bg);
+        }
+        
+        .search-result-item h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text);
+        }
+        
+        .search-result-item .coords {
+            font-size: 0.85rem;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-light);
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--success);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        /* Custom marker popup */
+        .leaflet-popup-content-wrapper {
+            border-radius: 15px !important;
+            background: var(--card-bg) !important;
+            color: var(--text) !important;
+            border: 2px solid var(--primary) !important;
+            box-shadow: 0 5px 20px var(--shadow) !important;
+            padding: 0 !important;
+            overflow: hidden;
+        }
+        
+        .leaflet-popup-content {
+            margin: 0 !important;
+            padding: 20px !important;
+            text-align: center !important;
+            width: 280px !important;
+        }
+        
+        .leaflet-popup-content h3 {
+            font-size: 1.25rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .leaflet-popup-content .coordinates {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 15px 0;
+            word-break: break-all;
+            background: var(--light-bg);
+            padding: 12px;
+            border-radius: 10px;
+            letter-spacing: 0.5px;
+            color: var(--text);
+        }
+        
+        .copy-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(to right, var(--primary), var(--primary-light));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+        }
+        
+        .copy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+        }
+        
+        .copy-btn i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .leaflet-popup-tip-container {
+            display: none;
+        }
+        
+        .leaflet-control-attribution {
+            background: rgba(255, 255, 255, 0.8) !important;
+            color: var(--text) !important;
+            font-size: 0.75rem !important;
+            padding: 4px 8px !important;
+        }
+        
+        .leaflet-control-attribution a {
+            color: var(--primary) !important;
+        }
+        
+        /* Custom marker with label */
+        .restaurant-marker {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 150px;
+        }
+        
+        .restaurant-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 5px;
+            text-align: center;
+            text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white;
+        }
+        
+        .restaurant-pin {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            border: 2px solid white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+        
+        @media (max-width: 480px) {
+            .leaflet-popup-content .coordinates {
+                font-size: 1.2rem;
+            }
+            
+            .copy-btn {
+                font-size: 1rem;
+                padding: 12px;
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .leaflet-popup-content-wrapper {
+            animation: fadeIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-container">
+            <div class="map-search-overlay">
+                <div class="map-search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-input" placeholder="Search By Coordinates Or Name...">
+                    <div class="search-results" id="search-results"></div>
+                </div>
+            </div>
+            
+            <div id="map"></div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span>Location Copied To Clipboard!</span>
+    </div>
+    
+    <script>
+        // Function to capitalize the first letter of each word
+        function toTitleCase(str) {
+            return str.replace(/\w\S*/g, function(txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            });
+        }
+        
+        // Function to copy text to clipboard with fallback
+        function copyToClipboard(text) {
+            // Create a temporary textarea element
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                // Modern clipboard API
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast();
+                    }).catch(err => {
+                        // Fallback to document.execCommand
+                        document.execCommand('copy');
+                        showToast();
+                    });
+                } else {
+                    // Fallback for older browsers
+                    document.execCommand('copy');
+                    showToast();
+                }
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+                // Try one more fallback method
+                window.getSelection().removeAllRanges();
+                const range = document.createRange();
+                range.selectNode(textarea);
+                window.getSelection().addRange(range);
+                document.execCommand('copy');
+                window.getSelection().removeAllRanges();
+                showToast();
+            }
+            
+            // Remove the temporary element
+            document.body.removeChild(textarea);
+        }
+        
+        // Function to show toast notification
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Restaurant data
+        const restaurants = [
+            { id: 1, name: "Royal Pharmacy Sabha Al Salem B3", lat: 29.253244, lng: 48.08216 },
+            { id: 2, name: "Sandwich Sabha Al Salem B2", lat: 29.248945, lng: 48.089796 },
+            { id: 3, name: "Karak Sabha Al Salem B2", lat: 29.249006, lng: 48.089773 },
+            { id: 4, name: "Fatayer Sabha Al Salem B2", lat: 29.248056, lng: 48.086639 },
+            { id: 5, name: "Ozone pharmacy Sabha Al Salem B1", lat: 29.263040, lng: 48.077729 },
+            { id: 6, name: "Shrimp Sabha Al Salem B1", lat: 29.260543, lng: 48.082316 },
+            { id: 7, name: "McDonald's Sabha Al Salem B1", lat: 29.264494, lng: 48.084917 },
+            { id: 8, name: "Baskin Sabha Al Salem B1", lat: 29.265885, lng: 48.079267 },
+            { id: 9, name: "Rock house Sabha Al Salem B1", lat: 29.261549, lng: 48.082508 },
+            { id: 10, name: "Lov Dite Sabha Al Salem B1", lat: 29.261549, lng: 48.081417 },
+            { id: 11, name: "Mr Baker Qusour B5", lat: 29.215200, lng: 48.075172 },
+            { id: 12, name: "Chaclata Sweet Mubarak Al kabir B4", lat: 29.187903, lng: 48.078313 },
+            { id: 13, name: "Pinkberr Mubarak Al Kabir B4", lat: 29.188450, lng: 48.078590 },
+            { id: 14, name: "McDonald's 303", lat: 29.208966, lng: 48.088701 },
+            { id: 15, name: "The Coffee Ben Mubarak Al kabir B3", lat: 29.180176, lng: 48.077296 },
+            { id: 16, name: "Starbucks Al Masayel B1", lat: 29.243942, lng: 48.086481 },
+            { id: 17, name: "Baskin ADN B3", lat: 29.236605, lng: 48.063145 },
+            { id: 18, name: "Coribau Coffee Sabha Al Salem B3", lat: 29.256406, lng: 48.082620 },
+            { id: 19, name: "Baher Sabha Al Salem B3", lat: 29.251650, lng: 48.081165 },
+            { id: 20, name: "Memes Curry Abu Hasaniy", lat: 29.195325, lng: 48.110182 },
+            { id: 21, name: "Arabica % Abu Hasaniy B10", lat: 29.195569, lng: 48.109640 },
+            { id: 22, name: "Caribau Coffee Abu Hasaniy B10", lat: 29.196611, lng: 48.109861 },
+            { id: 23, name: "Tha Coffee Ben Fanitess B9", lat: 29.213170, lng: 48.103787 },
+            { id: 24, name: "Starbucks Fanitess B9", lat: 29.213827, lng: 48.103511 },
+            { id: 25, name: "Pharmacy Daher", lat: 29.168150, lng: 48.064082 },
+            { id: 26, name: "Torino Daher", lat: 29.168150, lng: 48.063972 },
+            { id: 27, name: "Cramello jaber Al Ali B2", lat: 29.175205, lng: 48.075146 },
+            { id: 28, name: "Bartone jabar Al Ali B4", lat: 29.171639, lng: 48.078250 },
+            { id: 29, name: "Domins Qusour B5", lat: 29.214990, lng: 48.074240 },
+            { id: 30, name: "Domino Sabha Al Salem B1", lat: 29.260566, lng: 48.081832 },
+            { id: 31, name: "swaikhat Sabha Al Salem B1", lat: 29.260654, lng: 48.081850 },
+            { id: 32, name: "Turkish Fintas B2", lat: 29.175278, lng: 48.117250 },
+            { id: 33, name: "pick Abu Hasaniy B9", lat: 29.209076, lng: 48.105147 },
+            { id: 34, name: "dahlia juice Abu Hasaniy B9", lat: 29.209352, lng: 48.105486 },
+            { id: 35, name: "Fatayer Sabha Al Salem B2", lat: 29.248056, lng: 48.086639 },
+            { id: 36, name: "Health Srubio B1", lat: 29.264048, lng: 48.084213 },
+            { id: 37, name: "saber Al Ali B4", lat: 29.171639, lng: 48.078250 },
+            { id: 38, name: "Caribau Sweet B2", lat: 29.175205, lng: 48.075146 },
+            { id: 39, name: "mama Baker Al Fintas B1", lat: 29.182252, lng: 48.116121 },
+            { id: 40, name: "Bartone Coffee Al Masayel B2", lat: 29.243020, lng: 48.088095 },
+            { id: 41, name: "Baskin Sabha Al Salem B1", lat: 29.265885, lng: 48.079267 },
+            { id: 42, name: "Rock house Sabha Al Salem B1", lat: 29.261549, lng: 48.082508 },
+            { id: 43, name: "Lov Dite Sabha Al Salem B1", lat: 29.261549, lng: 48.081417 },
+            { id: 44, name: "CAF Coffee Sabha Al Salem B1", lat: 29.266013, lng: 48.081501 },
+            { id: 45, name: "Bybartone Coffee Sabha Al Salem B1", lat: 29.267147, lng: 48.081449 },
+            { id: 46, name: "Raising Canes Sabha Al Salem B1", lat: 29.266100, lng: 48.078418 },
+            { id: 47, name: "Caessara Sabha Al Salem B10", lat: 29.255700, lng: 48.050400 },
+            { id: 48, name: "MEAT Sabha Al Salem B10", lat: 29.256306, lng: 48.052361 },
+            { id: 49, name: "Trolley Sabah Al Salem B12", lat: 29.242473, lng: 48.063273 },
+            { id: 50, name: "EOL Coffee Sabha Al Salem B12", lat: 29.242384, lng: 48.063155 },
+            { id: 51, name: "Zaatar w Zeit Fnaitess B9", lat: 29.209280, lng: 48.105480 },
+            { id: 52, name: "Pick Fnaitess B9", lat: 29.209076, lng: 48.105141 },
+            { id: 53, name: "dahlia juice Fnaitess B9", lat: 29.209352, lng: 48.105486 },
+            { id: 54, name: "The Little Beet Fnaitess B9", lat: 29.209361, lng: 48.105361 },
+            { id: 55, name: "DIP & DIP Fnaitess B9", lat: 29.209330, lng: 48.105063 },
+            { id: 56, name: "BBT Fnaitess B9", lat: 29.214819, lng: 48.103580 },
+            { id: 57, name: "(DH) kitchen Fnaitess B9", lat: 29.213827, lng: 48.103511 },
+            { id: 58, name: "Starbucks Fnaitess B9", lat: 29.213827, lng: 48.103511 },
+            { id: 59, name: "zaze coffee Fnaitess B9", lat: 29.219402, lng: 48.101902 },
+            { id: 60, name: "Trolley sabha Al salem B12", lat: 29.242473, lng: 48.063273 },
+            { id: 61, name: "EOL coffee sabha Al salem B12", lat: 29.242384, lng: 48.063155 },
+            { id: 62, name: "Talabat met 1", lat: 29.198281, lng: 48.050598 },
+            { id: 63, name: "Talabat met 2", lat: 29.202493, lng: 48.051059 },
+            { id: 64, name: "Cramello Sweet jabar Al Ali B2", lat: 29.175205, lng: 48.075146 },
+            { id: 65, name: "Little cesarean pizza", lat: 29.168302, lng: 48.064019 },
+            { id: 66, name: "pharmacy Daher", lat: 29.168150, lng: 48.064082 },
+            { id: 67, name: "Torino Sweet Daher", lat: 29.167413, lng: 48.063972 },
+            { id: 68, name: "Zaatar w Zeit Fnaitess B9", lat: 29.209280, lng: 48.105480 },
+            { id: 69, name: "Pick Fnaitess B9", lat: 29.209076, lng: 48.105141 },
+            { id: 70, name: "dahlia juice Fnaitess B9", lat: 29.209352, lng: 48.105486 },
+            { id: 71, name: "The Little Beet Fnaitess B9", lat: 29.209361, lng: 48.105361 },
+            { id: 72, name: "The coffee Bean Fnaitess new B9", lat: 29.213170, lng: 48.103787 },
+            { id: 73, name: "Ellena Fnaitess B9", lat: 29.209090, lng: 48.105425 },
+            { id: 74, name: "Raising cane s sabha Al salem B1", lat: 29.266100, lng: 48.078418 },
+            { id: 75, name: "voco aviation Al Q", lat: 29.199929, lng: 48.051000 },
+            { id: 76, name: "Domins pizzas Al Qusour B5", lat: 29.214990, lng: 48.074240 },
+            { id: 77, name: "sabha Al salem B13", lat: 29.246058, lng: 48.051227 },
+            { id: 78, name: "MEAT sabha Al salem B10", lat: 29.256306, lng: 48.052361 },
+            { id: 79, name: "UK AI Q", lat: 29.199053, lng: 48.050158 },
+            { id: 80, name: "EAST AI Q", lat: 29.198916, lng: 48.049556 },
+            { id: 81, name: "Anna's Al Q", lat: 29.295061, lng: 48.048050 },
+            { id: 82, name: "Torino sweet Daher", lat: 29.167413, lng: 48.063972 },
+            { id: 83, name: "Froyo al Q", lat: 29.199361, lng: 48.051833 },
+            { id: 84, name: "caesars B5", lat: 29.215500, lng: 48.074100 },
+            { id: 85, name: "Caribau coffee Al Q", lat: 29.198219, lng: 48.053371 },
+            { id: 86, name: "The coffee Bean Fnaitess new B9", lat: 29.213170, lng: 48.103787 },
+            { id: 87, name: "Ellena Fnaitess B9", lat: 29.209090, lng: 48.105425 },
+            { id: 88, name: "Raising cane s sabha Al salem B1", lat: 29.266100, lng: 48.078418 },
+            { id: 89, name: "voco aviation Al Q", lat: 29.199929, lng: 48.051000 },
+            { id: 90, name: "Domins pizzas Al Qusour B5", lat: 29.214990, lng: 48.074240 },
+            { id: 91, name: "sabha Al salem B13", lat: 29.246058, lng: 48.051227 },
+            { id: 92, name: "MEAT sabha Al salem B10", lat: 29.256306, lng: 48.052361 },
+            { id: 93, name: "UK AI Q", lat: 29.199053, lng: 48.050158 },
+            { id: 94, name: "EAST AI Q", lat: 29.198916, lng: 48.049556 },
+            { id: 95, name: "Anna's Al Q", lat: 29.295061, lng: 48.048050 },
+            { id: 96, name: "Doha Al Q", lat: 29.199936, lng: 48.052490 },
+            { id: 97, name: "Hi & Bi Al Q", lat: 29.197052, lng: 48.053957 },
+            { id: 98, name: "McDonald's mahboul", lat: 29.137328, lng: 48.115799 },
+            { id: 99, name: "% Coffee Abu Hasaniya", lat: 29.195569, lng: 48.109640 },
+            { id: 100, name: "Tabla 5 Abu Hasaniya B10", lat: 29.194883, lng: 48.110339 },
+            { id: 101, name: "Caribau coffee Abu Hasaniya B10", lat: 29.196611, lng: 48.109861 },
+            { id: 102, name: "dahlia juice Abu Hasaniya B10", lat: 29.196393, lng: 48.109608 },
+            { id: 103, name: "McDonald's Qusour 303", lat: 29.208966, lng: 48.088701 },
+            { id: 104, name: "pinkberr mubarak Al kabir B4", lat: 29.188450, lng: 48.078590 },
+            { id: 105, name: "Chaclata Sweet mubarak Al kabir B4", lat: 29.187903, lng: 48.078313 },
+            { id: 106, name: "Caesars sabha Al salem B10", lat: 29.255700, lng: 48.050400 },
+            { id: 107, name: "Love Diet Food sabha Al salem B1", lat: 29.262778, lng: 48.081417 },
+            { id: 108, name: "Rock Home sabha Al salem B1", lat: 29.261549, lng: 48.082508 },
+            { id: 109, name: "The coffee Bean mubarak Al kabir B3", lat: 29.180176, lng: 48.077296 },
+            { id: 110, name: "Baher B3 sabha Al salem", lat: 29.251650, lng: 48.081165 },
+            { id: 111, name: "ROYAL pharmacy sabha Al salem B3", lat: 29.253244, lng: 48.08216 },
+            { id: 112, name: "lb 295 sabha Al salem B1", lat: 29.265690, lng: 48.078388 },
+            { id: 113, name: "Karak STATION AIQ", lat: 29.198118, lng: 48.051507 },
+            { id: 114, name: "TROLLEY AL Q", lat: 29.197536, lng: 48.053736 },
+            { id: 115, name: "McDonald's Al Q", lat: 29.201039, lng: 48.045268 },
+            { id: 116, name: "China Garden Al Q", lat: 29.200701, lng: 48.046471 },
+            { id: 117, name: "Doha Al Q", lat: 29.199936, lng: 48.052490 },
+            { id: 118, name: "Ringer sishi Sabha Al salem B1", lat: 29.261139, lng: 48.083278 },
+            { id: 119, name: "Ozone pharmacy sabha Al salem B1", lat: 29.263040, lng: 48.077729 },
+            { id: 120, name: "Shrimpy Abu Halifa Kuwait Magic", lat: 29.134000, lng: 48.132300 },
+            { id: 121, name: "STARBUCKS Mahboul B3", lat: 29.137728, lng: 48.124148 },
+            { id: 122, name: "McDonald's Al Q", lat: 29.201039, lng: 48.045268 },
+            { id: 123, name: "Fatayer sabah Al salem B1", lat: 29.248056, lng: 48.086639 },
+            { id: 124, name: "Shrimpy Argan Sabah Al salem B1", lat: 29.260543, lng: 48.082316 },
+            { id: 125, name: "piatto sand sabha Al salem B1", lat: 29.263674, lng: 48.078049 },
+            { id: 126, name: "karak Al shayeb Sabha Al salem B1", lat: 29.249006, lng: 48.089773 },
+            { id: 127, name: "1 sandwich Sabha Al salem B1", lat: 29.248945, lng: 48.089796 },
+            { id: 128, name: "CAF Coffee sabha Al salem", lat: 29.266013, lng: 48.081501 },
+            { id: 129, name: "McDonald's Al Ahmadi", lat: 29.077454, lng: 48.084064 },
+            { id: 130, name: "The coffee Bean Ahmadi", lat: 29.079336, lng: 48.081661 },
+            { id: 131, name: "RND Coffee sabha Al salem B1", lat: 29.263557, lng: 48.077444 },
+            { id: 132, name: "Sealed Al Q", lat: 29.199927, lng: 48.051310 },
+            { id: 133, name: "GAL AI Q", lat: 29.200006, lng: 48.051324 },
+            { id: 134, name: "COCO aviation Al q", lat: 29.199929, lng: 48.051000 },
+            { id: 135, name: "Baskin Robbins sabah Al salem B1", lat: 29.265885, lng: 48.079267 },
+            { id: 136, name: "Krispy Kreme Sabah Al salem B1", lat: 29.265885, lng: 48.079267 },
+            { id: 137, name: "mama Baker Fintes B1", lat: 29.182252, lng: 48.116121 },
+            { id: 138, name: "McDonald's sabah Al salem B1", lat: 29.264494, lng: 48.084917 },
+            { id: 139, name: "LULU SWEET mahboula B1", lat: 29.138610, lng: 48.117082 },
+            { id: 140, name: "KARAK AL MESSILA Fnaitess B9", lat: 29.212372, lng: 48.104622 },
+            { id: 141, name: "Bartone coffee sabha Al salem B1", lat: 29.267147, lng: 48.081449 },
+            { id: 142, name: "WK Bargaer F", lat: 29.079227, lng: 28.128470 },
+            { id: 143, name: "Bartone jabar AL ali", lat: 29.171639, lng: 48.078250 },
+            { id: 144, name: "Starbucks Al Masayel", lat: 29.243942, lng: 48.086481 },
+            { id: 145, name: "Starbucks Al Masayel B1", lat: 29.243942, lng: 48.086486 },
+            { id: 146, name: "Benral Deek sabha Al salem B1", lat: 29.257170, lng: 48.083803 },
+            { id: 147, name: "The coffee Bean Fnaitess B9", lat: 29.213370, lng: 48.103787 },
+            { id: 148, name: "Baskin Fnaitess B9", lat: 29.213463, lng: 48.104169 },
+            { id: 149, name: "Mishmash sabha Al salem B1", lat: 29.257072, lng: 48.085099 },
+            { id: 150, name: "EIGHTY. SIX", lat: 29.195393, lng: 48.109608 },
+            { id: 151, name: "Meme,s Cerry Abu Hasaniya B10", lat: 29.195325, lng: 48.110182 },
+            { id: 152, name: "Bakkin Gata mall", lat: 29.174859, lng: 48.098047 },
+            { id: 153, name: "Talabat mart Egila", lat: 29.173978, lng: 48.097045 },
+            { id: 154, name: "Turkey Finras B2", lat: 29.175278, lng: 48.117250 },
+            { id: 155, name: "VINE Sweet Fnaitess B9", lat: 29.219466, lng: 48.102086 },
+            { id: 156, name: "Bo Mosoud Sabha Al salem B2", lat: 29.248321, lng: 48.087134 },
+            { id: 157, name: "Caf Cafe alQ", lat: 29.195111, lng: 48.048222 },
+            { id: 158, name: "Dozen alQ", lat: 29.196134, lng: 48.050656 },
+            { id: 159, name: "Oyo Sweet AI Q", lat: 29.195624, lng: 48.048425 },
+            { id: 160, name: "wK Burger sabha Al salem B2", lat: 29.246866, lng: 48.084053 },
+            { id: 161, name: "bips Salmiya Fnaitess B9", lat: 29.213333, lng: 48.103897 }
+        ];
+        
+        // Initialize the map
+        const map = L.map('map', {
+            zoomControl: false // Disable zoom control buttons
+        }).setView([29.253244, 48.08216], 13);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Add markers for each restaurant
+        const markers = [];
+        restaurants.forEach(restaurant => {
+            // Create a custom marker with label
+            const customIcon = L.divIcon({
+                className: 'restaurant-marker',
+                html: `
+                    <div class="restaurant-label">${toTitleCase(restaurant.name)}</div>
+                    <div class="restaurant-pin">
+                        <i class="fas fa-utensils"></i>
+                    </div>
+                `,
+                iconSize: [150, 50],
+                iconAnchor: [75, 50]
+            });
+            
+            const marker = L.marker([restaurant.lat, restaurant.lng], { icon: customIcon })
+                .addTo(map)
+                .bindPopup(`
+                    <h3>${toTitleCase(restaurant.name)}</h3>
+                    <div class="coordinates">${restaurant.lat}, ${restaurant.lng}</div>
+                    <button class="copy-btn" data-coords="${restaurant.lat}, ${restaurant.lng}">
+                        <i class="fas fa-copy"></i> Copy Coordinates
+                    </button>
+                `);
+                
+            markers.push({
+                marker,
+                restaurant
+            });
+        });
+        
+        // Copy coordinates functionality with improved event handling
+        document.addEventListener('click', function(e) {
+            // Check if the clicked element is a copy button or a child of a copy button
+            const copyButton = e.target.closest('.copy-btn');
+            if (copyButton) {
+                e.preventDefault(); // Prevent default behavior
+                const coords = copyButton.getAttribute('data-coords');
+                copyToClipboard(coords);
+            }
+        });
+        
+        // Search functionality
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                searchResults.classList.remove('show');
+                // Reset map view
+                map.setView([29.253244, 48.08216], 13);
+                return;
+            }
+            
+            // Filter restaurants by name or coordinates
+            const filteredRestaurants = restaurants.filter(restaurant => {
+                const nameMatch = restaurant.name.toLowerCase().includes(searchTerm);
+                const coordsMatch = `${restaurant.lat}, ${restaurant.lng}`.includes(searchTerm);
+                return nameMatch || coordsMatch;
+            });
+            
+            // Display search results
+            searchResults.innerHTML = '';
+            
+            if (filteredRestaurants.length === 0) {
+                searchResults.innerHTML = '<div class="search-result-item">No Restaurants Found</div>';
+            } else {
+                filteredRestaurants.forEach(restaurant => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `
+                        <h4>${toTitleCase(restaurant.name)}</h4>
+                        <div class="coords">${restaurant.lat}, ${restaurant.lng}</div>
+                    `;
+                    
+                    item.addEventListener('click', function() {
+                        map.setView([restaurant.lat, restaurant.lng], 16);
+                        
+                        // Find and open the popup for this restaurant
+                        const markerData = markers.find(m => m.restaurant.id === restaurant.id);
+                        if (markerData) {
+                            markerData.marker.openPopup();
+                        }
+                        
+                        // Clear search and hide results
+                        searchInput.value = '';
+                        searchResults.classList.remove('show');
+                    });
+                    
+                    searchResults.appendChild(item);
+                });
+            }
+            
+            searchResults.classList.add('show');
+            
+            // If only one result, zoom to it
+            if (filteredRestaurants.length === 1) {
+                const restaurant = filteredRestaurants[0];
+                map.setView([restaurant.lat, restaurant.lng], 16);
+                
+                // Find and open the popup for this restaurant
+                const markerData = markers.find(m => m.restaurant.id === restaurant.id);
+                if (markerData) {
+                    markerData.marker.openPopup();
+                }
+            } else if (filteredRestaurants.length > 0) {
+                // If multiple results, adjust map view to show all of them
+                const group = new L.featureGroup(
+                    filteredRestaurants.map(r => markers.find(m => m.restaurant.id === r.id).marker)
+                );
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        });
+        
+        // Hide search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.map-search-container')) {
+                searchResults.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
